@@ -6,9 +6,11 @@
 # install.packages("ggrepel")
 # install.packages("lobstr")
 # install.packages("mapproj")
-
-
+# install.packages("dummies")
+# install.packages('caTools')
+# install.packages('randomForest')
 # library(mapproj)
+
 library(tidyverse)
 library(caTools)
 library(gmodels)
@@ -17,6 +19,8 @@ library(ggrepel)
 library(sf)
 library(mapview)
 library(ggmap)
+library(dummies)
+library(caTools)
 
 dataset = tibble(read.csv('weatherAUS.csv'))
 dataset
@@ -94,16 +98,13 @@ ggmap(map) +
 ggmap(map) +
   stat_density_2d(
     data = Rlocations,
-    aes(
-      x = lon,
-      y = lat,
-      fill = stat(x)
-    ),
+    aes(x = lon, y = lat, fill = stat(x)),
     alpha = .1,
     bins = 30,
     geom = "polygon"
   ) +
   scale_fill_gradientn(colors = YlOrBr)
+
 
 # Rain by Month
 
@@ -119,27 +120,59 @@ ggplot(data=RainMonth, aes(x=Category, y=x, group=1)) +
   geom_point()
 
 
+############################################################################
+
+print(colMeans(is.na(dataset))) # Percentage of missing data in each column
+
+datasetClean <- subset(dataset, select=-c(Evaporation, Sunshine, Cloud9am, Cloud3pm, Date)) # Removing features with high NA precentage
+datasetClean <- datasetClean[complete.cases(datasetClean), ] # Removing NAs
 
 
+# One-Hot Encoding categorical features
 
+WD3<-dummy(datasetClean$WindDir3pm)
+WD9<-dummy(datasetClean$WindDir9am)
+WGD<-dummy(datasetClean$WindGustDir
+           )
+datasetD <- cbind(datasetClean, WD3)
+datasetD <- cbind(datasetD, WD9)
+datasetD <- cbind(datasetD, WGD)
 
+datasetD$RainToday <- factor(datasetD$RainToday,
+             levels = c('No', 'Yes'),
+             labels = c(0, 1))
 
-# Encoding categorical data
-dataset$Country = factor(dataset$Country,
-                         levels = c('France', 'Spain', 'Germany'),
-                         labels = c(1, 2, 3))
-dataset$Purchased = factor(dataset$Purchased,
-                           levels = c('No', 'Yes'),
-                           labels = c(0, 1))
+datasetD$RainTomorrow <- factor(datasetD$RainTomorrow,
+                   levels = c('No', 'Yes'),
+                   labels = c(0, 1))
+
+df<-tibble(datasetD)
+
 
 # Splitting the dataset into the Training set and Test set
-# install.packages('caTools')
-library(caTools)
-set.seed(123)
-split = sample.split(dataset$DependentVariable, SplitRatio = 0.8)
-training_set = subset(dataset, split == TRUE)
-test_set = subset(dataset, split == FALSE)
+set.seed(1337)
 
-# Feature Scaling
-# training_set = scale(training_set)
-# test_set = scale(test_set)
+split = sample.split(df$RainTomorrow, SplitRatio = 0.8)
+training_set = subset(df, split == TRUE)
+test_set = subset(df, split == FALSE)
+
+
+library(randomForest)
+y <- training_set$RainTomorrow
+X <- subset(training_set, select=-c(RainTomorrow))
+
+classifier = randomForest(x = X,
+                          y = y,
+                          ntree = 200)
+
+y_pred = predict(classifier, newdata = subset(test_set, select=-c(RainTomorrow)))
+
+# Confusion Matrix
+cm = table(test_set$RainTomorrow, y_pred)
+print(cm)
+
+# Accuracy Score
+accuracy = sum(y_pred == test_set$RainTomorrow) / nrow(test_set)
+print(accuracy)
+
+
