@@ -17,9 +17,7 @@ output: html_document
 # install.packages('randomForest')
 # install.packages('precrec')
 
-library(precrec)
 library(tidyverse)
-library(caTools)
 library(gmodels)
 library(ggthemes)
 library(ggrepel)
@@ -29,6 +27,7 @@ library(ggmap)
 library(dummies)
 library(caTools)
 library(randomForest)
+library(precrec)
 
 ```
 
@@ -60,7 +59,7 @@ locations_sf <- st_as_sf(locations, coords = c("lon", "lat"), crs = 4326)
 
 
 
-```{r}
+```{r warning=FALSE}
 aus_coord <- geocode("Australia")
 
 map <- get_googlemap(center = c(aus_coord$lon, aus_coord$lat), zoom = 4)
@@ -69,7 +68,7 @@ map <- get_googlemap(center = c(aus_coord$lon, aus_coord$lat), zoom = 4)
 ggmap(map) +
   geom_point(data = locations,
              aes(x = lon, y = lat, size = x),
-             color = "red", alpha = 0.5)
+             color = "red", alpha = 0.3)
 ```
 
 
@@ -96,7 +95,7 @@ print(Rlocations_sf)
 
 
 
-```{r}
+```{r warning=FALSE}
 YlOrBr <- c("#FFFFD4", "#FED98E", "#FE9929", "#D95F0E", "#993404")
 
 ggmap(map) +
@@ -144,17 +143,35 @@ datasetClean <- datasetClean[complete.cases(datasetClean), ] # Removing NAs
 
 ```
 
-```{r}
+```{r warning=FALSE}
 # One-Hot Encoding categorical features
 
-WD3<-dummy.data.frame(data = datasetClean, dummy.classes = "WindDir3pm")
-WD9<-dummy.data.frame(data = WD3, dummy.classes = "WindDir9am")
-datasetD<- data.frame(dummy.data.frame(data = WD9, dummy.classes = "WindGustDir"))
+# WD3<-dummy.data.frame(data = datasetClean, dummy.classes = "WindDir3pm")
+# Loc<-dummy.data.frame(data = WD3, dummy.classes = "Location")
+# WD9<-dummy.data.frame(data = Loc, dummy.classes = "WindDir9am")
+# datasetD<- data.frame(dummy.data.frame(data = WD9, dummy.classes = "WindGustDir"))
+# 
 
 
-# datasetD <- cbind(datasetClean, WD3)
-# datasetD <- cbind(datasetD, WD9)
-# datasetD <- cbind(datasetD, WGD)
+WD3<-dummy(datasetClean$WindDir3pm)
+WD9<-dummy(datasetClean$WindDir9am)
+WGD<-dummy(datasetClean$WindGustDir)
+Loc<-dummy(datasetClean$Location)
+
+
+# This is so that Knit doesn't crash (idk why)
+colnames(WD3) <- paste("WindDir3pm", colnames(WD3), sep = "_")
+colnames(WD9) <- paste("WindDir9am", colnames(WD9), sep = "_")
+colnames(WGD) <- paste("WindGustDir", colnames(WGD), sep = "_")
+colnames(Loc) <- paste("Location", colnames(Loc), sep = "_")
+
+
+datasetD <- cbind(datasetClean, WD3)
+datasetD <- cbind(datasetD, WD9)
+datasetD <- cbind(datasetD, WGD)
+datasetD <- cbind(datasetD, Loc)
+
+
 
 datasetD$RainToday <- factor(datasetD$RainToday,
              levels = c('No', 'Yes'),

@@ -9,7 +9,6 @@
 # install.packages("dummies")
 # install.packages('caTools')
 # install.packages('randomForest')
-# library(mapproj)
 
 library(tidyverse)
 library(caTools)
@@ -41,7 +40,6 @@ dataset$RainTomorrow
 MTemp <- dataset[!is.na(dataset$MaxTemp), ] %>% 
   select(Location, MaxTemp)
 
-
 TempLocation <- aggregate(MTemp$MaxTemp, by=list(Category=MTemp$Location), FUN=mean)
 TempLocation$Category <- paste(TempLocation$Category, ", Australia")# Adding Australia to the end of location name since there are many cities with the same names in other countries
 
@@ -56,10 +54,7 @@ locations_sf <- st_as_sf(locations, coords = c("lon", "lat"), crs = 4326)
 
 aus_coord <- geocode("Australia")
 
-map.in <- get_googlemap(center = c(aus_coord$lon, aus_coord$lat), 
-                        zoom = 4,
-                        color = "bw",
-                        style = "feature:road|visibility:off&style=element:labels|visibility:off&style=feature:administrative|visibility:off")
+map <- get_googlemap(center = c(aus_coord$lon, aus_coord$lat), zoom = 4)
 
 
 
@@ -68,6 +63,11 @@ ggmap(map) +
              aes(x = lon, y = lat, size = x),
              color = "red", alpha = 0.5)
 
+
+# map.in <- get_googlemap(center = c(aus_coord$lon, aus_coord$lat), 
+#                         zoom = 4,
+#                         color = "bw",
+#                         style = "feature:road|visibility:off&style=element:labels|visibility:off&style=feature:administrative|visibility:off")
 
 
 
@@ -111,7 +111,7 @@ ggmap(map) +
 RD <- dataset[!is.na(dataset$Rainfall), ] %>% 
   select(Date, Rainfall)
 
-RD$Date <= substring(RD$Date,6,7) # Month only
+substring(RD$Date,6,7) # Month only
 RainMonth = aggregate(RD$Rainfall, by=list(Category=substring(RD$Date,6,7)), FUN=mean) # Mean Rainfall by month
 
 
@@ -132,8 +132,8 @@ datasetClean <- datasetClean[complete.cases(datasetClean), ] # Removing NAs
 
 WD3<-dummy(datasetClean$WindDir3pm)
 WD9<-dummy(datasetClean$WindDir9am)
-WGD<-dummy(datasetClean$WindGustDir
-           )
+WGD<-dummy(datasetClean$WindGustDir)
+
 datasetD <- cbind(datasetClean, WD3)
 datasetD <- cbind(datasetD, WD9)
 datasetD <- cbind(datasetD, WGD)
@@ -175,4 +175,4 @@ print(cm)
 accuracy = sum(y_pred == test_set$RainTomorrow) / nrow(test_set)
 print(accuracy)
 
-
+# ROC Curve
