@@ -1,5 +1,5 @@
 ---
-title: "Predizendo Se vai chover Amanhã na Australia"
+title: "Predizendo Chuva na Australia"
 output: html_document
 ---
 
@@ -30,17 +30,29 @@ library(randomForest)
 library(precrec)
 
 ```
+<div style="text-align:center"><img src="./Aus_fire.jpg" alt="drawing" width=50% /></div><div style="text-align:center" >Matthew Abbott / The New York Times</div><b/><br/>
 
-FALAR DOS FOGOS E COMO PREDIZER PODE SER IMPORTANTE PRA REMANEJAR OS ESFORCOS OU SABER SE UM FOCO DE INCENDIO PODE SURGIR
+
+### Introdução 
+
+Os incêndios florestais na Austrália são uma ocorrência regular que teve um papel significativo na formação da natureza do continente ao longo de milhões de anos. No entanto, os incêndios podem causar danos materiais significativos e levar à perda de vidas humanas e animais. Os incêndios florestais mataram cerca de 800 pessoas e bilhões de animais desde 1851. Estima-se que entre 2019 e 2020 os incêndios mataram pelo menos 33 pessoas e mais de 3 bilhões de animais.
+
+Geralmente, os incêndios mais devastadores são precedidos por altas temperaturas, baixa umidade relativa e fortes ventos, que criam as condições ideais para a rápida propagação do fogo. A chuva é a maior aliada ao combate ao fogo e na mitigação do surgimento de novos de focos de incêndios. Outro problema que agrava a situação na Austrália, é a forte dependência do país de civis para conter seus incêndios, cerca de 90% dos bombeiros combatendo fogos florestais são voluntários. 
+
+Portanto, considerando os recursos limitados para combate aos incêndios florestais, ainda mais com o aumento das mudanças climáticas que estão tornando esses eventos mais frequentes e devastadores, saber se irá chover em uma região específica dadas algumas medições é importante para direcionar os esforços onde eles são mais necessários. 
+
+### Visualizando os Dados 
 
 ```{r}
 dataset = tibble(read.csv('weatherAUS.csv'))
 print(dataset)
 ```
 
+#### Mapa com as Temperaturas Máximas de Cada Local 
 
+Usando a API do Google Maps para salvar as coordenadas geográficas de cada local de medição, como existem vários lugares com o mesmo nome em diferentes países anglófonos, é necessário concatenar o nome do país no final do local para garantir que as coordenadas estarão coerentes. 
 ```{r}
-MTemp <- dataset[!is.na(dataset$MaxTemp), ] %>% 
+MTemp <- dataset[!is.na(dataset$MaxTemp), ] %>%
   select(Location, MaxTemp)
 
 TempLocation <- aggregate(MTemp$MaxTemp, by=list(Category=MTemp$Location), FUN=mean)
@@ -57,8 +69,6 @@ locations_sf <- st_as_sf(locations, coords = c("lon", "lat"), crs = 4326)
 
 ```
 
-
-
 ```{r warning=FALSE}
 aus_coord <- geocode("Australia")
 
@@ -71,17 +81,16 @@ ggmap(map) +
              color = "red", alpha = 0.3)
 ```
 
-
+#### Mapa de Calor de Pluvialidade
 
 ```{r}
-RF <- dataset[!is.na(dataset$Rainfall), ] %>% 
+RF <- dataset[!is.na(dataset$Rainfall), ] %>%
   select(Location, Rainfall)
 
 RainLocation <- aggregate(RF$Rainfall, by=list(Category=RF$Location), FUN=sum)
 RainLocation$Category <- paste(RainLocation$Category, ", Australia")# Adding Australia to the end of location name since there are many cities with the same names in other countries
 
 ```
-
 
 ```{r message=FALSE}
 Rcities_df <- as.data.frame(RainLocation)
@@ -92,8 +101,6 @@ Rlocations_sf <- st_as_sf(Rlocations, coords = c("lon", "lat"), crs = 4326)
 print(Rlocations_sf)
 
 ```
-
-
 
 ```{r warning=FALSE}
 YlOrBr <- c("#FFFFD4", "#FED98E", "#FE9929", "#D95F0E", "#993404")
@@ -110,17 +117,16 @@ ggmap(map) +
 
 ```
 
-
+### Média de Precipitação por Mês
 
 ```{r}
-RD <- dataset[!is.na(dataset$Rainfall), ] %>% 
+RD <- dataset[!is.na(dataset$Rainfall), ] %>%
   select(Date, Rainfall)
 
 # substring(RD$Date,6,7) # Month only
 RainMonth = aggregate(RD$Rainfall, by=list(Category=substring(RD$Date,6,7)), FUN=mean) # Mean Rainfall by month
 
 ```
-
 
 
 ```{r}
@@ -131,10 +137,9 @@ ggplot(data=RainMonth, aes(x=Category, y=x, group=1)) +
 ```
 
 
+### Criando o modelo
 
-
-
-
+#### Removendo colunas com muitos dados faltando e depois removendo entradas incompletas. 
 ```{r}
 print(colMeans(is.na(dataset))) # Percentage of missing data in each column
 
@@ -143,34 +148,24 @@ datasetClean <- datasetClean[complete.cases(datasetClean), ] # Removing NAs
 
 ```
 
+#### One-Hot encoding nas features categóricas.
+
 ```{r warning=FALSE}
-# One-Hot Encoding categorical features
-
-# WD3<-dummy.data.frame(data = datasetClean, dummy.classes = "WindDir3pm")
-# Loc<-dummy.data.frame(data = WD3, dummy.classes = "Location")
-# WD9<-dummy.data.frame(data = Loc, dummy.classes = "WindDir9am")
-# datasetD<- data.frame(dummy.data.frame(data = WD9, dummy.classes = "WindGustDir"))
-# 
-
 
 WD3<-dummy(datasetClean$WindDir3pm)
 WD9<-dummy(datasetClean$WindDir9am)
 WGD<-dummy(datasetClean$WindGustDir)
 Loc<-dummy(datasetClean$Location)
 
-
-# This is so that Knit doesn't crash (idk why)
 colnames(WD3) <- paste("WindDir3pm", colnames(WD3), sep = "_")
 colnames(WD9) <- paste("WindDir9am", colnames(WD9), sep = "_")
 colnames(WGD) <- paste("WindGustDir", colnames(WGD), sep = "_")
 colnames(Loc) <- paste("Location", colnames(Loc), sep = "_")
 
-
 datasetD <- cbind(datasetClean, WD3)
 datasetD <- cbind(datasetD, WD9)
 datasetD <- cbind(datasetD, WGD)
 datasetD <- cbind(datasetD, Loc)
-
 
 
 datasetD$RainToday <- factor(datasetD$RainToday,
@@ -185,13 +180,16 @@ df<-tibble(datasetD)
 
 ```
 
+#### Separando em datasets de treino e teste.
+
 ```{r}
 set.seed(1337)
-
 split = sample.split(df$RainTomorrow, SplitRatio = 0.8)
 training_set = subset(df, split == TRUE)
 test_set = subset(df, split == FALSE)
 ```
+
+#### Treinando o classificador Random Forest.
 
 ```{r}
 y <- training_set$RainTomorrow
@@ -204,6 +202,8 @@ classifier = randomForest(x = X,
 classifier
 ```
 
+#### Matriz de confusão.
+
 ```{r}
 y_pred = predict(classifier, newdata = subset(test_set, select=-c(RainTomorrow)))
 
@@ -213,11 +213,15 @@ print(cm)
 
 ```
 
+#### Calculando a acurácia do modelo.
+
 ```{r}
 # Accuracy Score
 accuracy = sum(y_pred == test_set$RainTomorrow) / nrow(test_set)
 print(accuracy)
 ```
+
+#### Visualizando as curvas de ROC e Precision e Recall.
 
 ```{r}
 precrec_obj <- evalmod(scores =as.integer(y_pred), labels = test_set$RainTomorrow)
