@@ -48,72 +48,83 @@ dataset = tibble(read.csv('weatherAUS.csv'))
 print(dataset)
 ```
 
-#### Mapa com as Temperaturas Máximas de Cada Local 
 
-Usando a API do Google Maps para salvar as coordenadas geográficas de cada local de medição, como existem vários lugares com o mesmo nome em diferentes países anglófonos, é necessário concatenar o nome do país no final do local para garantir que as coordenadas estarão coerentes. 
-```{r}
-MTemp <- dataset[!is.na(dataset$MaxTemp), ] %>%
-  select(Location, MaxTemp)
-
-TempLocation <- aggregate(MTemp$MaxTemp, by=list(Category=MTemp$Location), FUN=mean)
-TempLocation$Category <- paste(TempLocation$Category, ", Australia")# Adding Australia to the end of location name since there are many cities with the same names in other countries
-
-```
+Usando a API do Google Maps para salvar as coordenadas geográficas de cada local de medição, como existem vários lugares com o mesmo nome em diferentes países anglófonos, é necessário concatenar o nome do país no final do local para garantir que as coordenadas estarão coerentes
 
 ```{r message=FALSE}
-cities_df <- as.data.frame(TempLocation)
+LocCount <- dataset %>% count(Location)
+
+LocCount$Category <- paste(LocCount$Location, ", Australia")# Adding Australia to the end of location name since there are many cities with the same names in other countries
+
+cities_df <- as.data.frame(LocCount)
 locations_df <- mutate_geocode(cities_df, Category)
 locations <- as_tibble(locations_df)
 
-locations_sf <- st_as_sf(locations, coords = c("lon", "lat"), crs = 4326)
-
+print(locations)
 ```
 
-```{r warning=FALSE}
+
+```{r}
+df <- merge(x = dataset, y = locations, by = "Location", all = TRUE) # Outer join
+```
+
+```{r message=FALSE, warning=FALSE}
+# Creating Map Canvas
 aus_coord <- geocode("Australia")
 
 map <- get_googlemap(center = c(aus_coord$lon, aus_coord$lat), zoom = 4)
 
+```
+
+#### Mapa com as Temperaturas Máximas de Cada Local 
+
+```{r fig.height=7, fig.width=11, warning=FALSE}
+
+
+MTemp <- df[!is.na(df$MaxTemp), ] %>% # Removing missing data
+  select(Location, MaxTemp, lon, lat)
+
+
+aggTemp <- aggregate(MTemp$MaxTemp, by = list(Locaton=MTemp$Location , Longitude=MTemp$lon , Latitude=MTemp$lat), FUN=mean) # Aggregating by Location and the Average  MaxTemp
+
 
 ggmap(map) +
-  geom_point(data = locations,
-             aes(x = lon, y = lat, size = x),
-             color = "red", alpha = 0.3)
+  geom_point(data = aggTemp,
+             aes(x = Longitude, y = Latitude, size = x),
+             color = "red", alpha = 0.3)  + 
+  theme(legend.position = "left") +
+  xlab("Longitude") + 
+  ylab("Latitude") +
+  labs(size="Average Max. Temperature (°C)")
+
+
 ```
 
 #### Mapa de Calor de Pluvialidade
 
-```{r}
-RF <- dataset[!is.na(dataset$Rainfall), ] %>%
-  select(Location, Rainfall)
+```{r fig.height=7, fig.width=11, warning=FALSE}
+RF <- df[!is.na(df$Rainfall), ] %>% # Removing missing data
+  select(Location, Rainfall, lon, lat)
 
-RainLocation <- aggregate(RF$Rainfall, by=list(Category=RF$Location), FUN=sum)
-RainLocation$Category <- paste(RainLocation$Category, ", Australia")# Adding Australia to the end of location name since there are many cities with the same names in other countries
+aggRain <- aggregate(RF$Rainfall, by = list(Locaton=RF$Location , Longitude=RF$lon , Latitude=RF$lat), FUN=sum) # Aggregating by Location and the sum of Rainfall
 
-```
 
-```{r message=FALSE}
-Rcities_df <- as.data.frame(RainLocation)
-Rlocations_df <- mutate_geocode(Rcities_df, Category)
-Rlocations <- as_tibble(Rlocations_df)
-
-Rlocations_sf <- st_as_sf(Rlocations, coords = c("lon", "lat"), crs = 4326)
-print(Rlocations_sf)
-
-```
-
-```{r warning=FALSE}
 YlOrBr <- c("#FFFFD4", "#FED98E", "#FE9929", "#D95F0E", "#993404")
 
 ggmap(map) +
   stat_density_2d(
-    data = Rlocations,
-    aes(x = lon, y = lat, fill = stat(x)),
+    data = aggRain,
+    aes(x = Longitude, y = Latitude, fill = stat(x)),
     alpha = .1,
     bins = 30,
     geom = "polygon"
   ) +
-  scale_fill_gradientn(colors = YlOrBr)
+  scale_fill_gradientn(colors = YlOrBr) +
+  theme(legend.position = "left") +
+  xlab("Longitude") + 
+  ylab("Latitude") +
+  labs(fill="Rainfall in mm")
+
 
 ```
 
@@ -124,15 +135,18 @@ RD <- dataset[!is.na(dataset$Rainfall), ] %>%
   select(Date, Rainfall)
 
 # substring(RD$Date,6,7) # Month only
-RainMonth = aggregate(RD$Rainfall, by=list(Category=substring(RD$Date,6,7)), FUN=mean) # Mean Rainfall by month
+RainMonth = aggregate(RD$Rainfall, by=list(Month=substring(RD$Date,6,7)), FUN=mean) # Average daily Rainfall by month
 
 ```
 
 
 ```{r}
-ggplot(data=RainMonth, aes(x=Category, y=x, group=1)) +
+ggplot(data=RainMonth, aes(x=Month, y=x, group=1)) +
   geom_line()+
-  geom_point()
+  geom_point() +
+  xlab("Month") +
+  ylab("Average Rainfall (mm per day)") 
+
 
 ```
 
@@ -148,7 +162,7 @@ datasetClean <- datasetClean[complete.cases(datasetClean), ] # Removing NAs
 
 ```
 
-#### One-Hot encoding nas features categóricas.
+#### One-Hot encoding as features categóricas.
 
 ```{r warning=FALSE}
 
