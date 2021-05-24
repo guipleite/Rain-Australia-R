@@ -16,7 +16,9 @@ output: html_document
 # install.packages('caTools')
 # install.packages('randomForest')
 # install.packages('precrec')
+#install.packages("fmsb")
 
+library(fmsb)
 library(tidyverse)
 library(gmodels)
 library(ggthemes)
@@ -131,7 +133,7 @@ ggmap(map) +
 ### Média de Precipitação por Mês
 
 ```{r}
-RD <- dataset[!is.na(dataset$Rainfall), ] %>%
+RD <- df[!is.na(df$Rainfall), ] %>%   # Removing missing data
   select(Date, Rainfall)
 
 # substring(RD$Date,6,7) # Month only
@@ -150,6 +152,66 @@ ggplot(data=RainMonth, aes(x=Month, y=x, group=1)) +
 
 ```
 
+### Precipitação em relação à direção do vento
+
+```{r warning=FALSE}
+DD<- df[!is.na(df$Rainfall), ] %>%  # Removing missing data
+  select(Date, Rainfall,WindDir3pm, WindDir9am)
+
+# Aggregating by Wind Direction and the avg Rainfall for 3pm and 9am
+aggDir3 <- aggregate(DD$Rainfall, by = list(Dir3pm=DD$WindDir3pm), FUN=mean) 
+aggDir9 <- aggregate(DD$Rainfall, by = list(Dir9am=DD$WindDir9am), FUN=mean)
+
+# Transposing the Dataframes so the columns are the mean Rainfall for each direction and the rows are the differente times
+final_df3 <- as.data.frame(t(aggDir3))
+names(final_df3) <- lapply(final_df3[1, ], as.character)
+final_df3 <- final_df3[-1,] 
+rownames(final_df3) <- "3pm"
+
+final_df9 <- as.data.frame(t(aggDir9))
+names(final_df9) <- lapply(final_df9[1, ], as.character)
+final_df9 <- final_df9[-1,] 
+rownames(final_df9) <- "9am"
+
+final_df <- rbind(final_df3, final_df9)
+
+final_df <- final_df %>% mutate_if(is.character,as.numeric)
+
+# Adding a Min and Max rows to the Dataframe for the chart plotting
+max_min <- data.frame(
+  N = c(4, 0), NNW = c(4, 0), NW = c(4, 0),
+  WNW = c(4, 0), W = c(4, 0), WSW = c(4, 0),
+  SW = c(4, 0), SSW = c(4, 0), S = c(4, 0),SSE = c(4, 0),
+  SE = c(4, 0), ESE = c(4, 0),E = c(4, 0),
+  ENE = c(4, 0), NE = c(4, 0),   NNE = c(4, 0)
+)
+
+rownames(max_min) <- c("Max", "Min")
+final_df <- rbind(max_min, final_df)
+
+```
+
+
+```{r warning=FALSE}
+op <- par(mar = c(1, 2, 2, 2))
+
+radarchart(
+    final_df, axistype = 1,
+    color = c("#00AFBB","#FC4E07"), pfcol = scales::alpha(c("#00AFBB","#FC4E07"), 0.5),
+    plwd = 2, plty = 1,cglcol = "grey", cglty = 1, cglwd = 0.8,    axislabcol = "grey", 
+    caxislabels = c(0, 1, 2, 3, 4),vlcex = 0.7, vlabels = colnames(final_df),
+    title = "Average Rainfall in mm by Wind Direction"
+  )
+
+legend(
+  x = "bottomleft", legend = rownames(final_df[-c(1,2),]), horiz = TRUE,
+  bty = "n", pch = 20 , col = c("#00AFBB", "#FC4E07"),
+  text.col = "black", cex = , pt.cex = 1.5
+  )
+
+par(op)
+
+```
 
 ### Criando o modelo
 
@@ -242,6 +304,7 @@ precrec_obj <- evalmod(scores =as.integer(y_pred), labels = test_set$RainTomorro
 autoplot(precrec_obj)
 
 ```
+
 
 
 
