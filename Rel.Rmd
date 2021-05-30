@@ -44,7 +44,7 @@ Geralmente, os incêndios mais devastadores são precedidos por altas temperatur
 Portanto, considerando os recursos limitados para combate aos incêndios florestais, ainda mais com o aumento das mudanças climáticas que estão tornando esses eventos mais frequentes e devastadores, saber se irá chover em uma região específica dadas algumas medições é importante para direcionar os esforços onde eles são mais necessários. 
 
 ### Dataset
-O conjunto de dados utilizado contém cerca de 10 anos de observações diárias tiradas de estações meteorológicas em 49 locais na Austrália. O dataset é composto por informações como Data e Local da observação, dados meteorológicos do dia no local como Direção do vento, humidade e temperatura além de duas features categóricas: RainToday e RainTomorrow que indicam se choveu 1 mm ou mais no dia da observação e no dia seguinte respectivamente.  
+O conjunto de dados utilizado contém cerca de 10 anos de observações diárias tiradas de estações meteorológicas em 49 locais na Austrália. O dataset é composto por informações como Data e Local da observação, dados meteorológicos do dia no local como Direção do vento, humidade e temperatura além de duas features categóricas: RainToday e RainTomorrow que indicam se choveu 1 mm ou mais no dia da observação e no dia seguinte, respectivamente.  
 
 ### Visualizando os Dados 
 
@@ -348,13 +348,7 @@ cat("Recall:", recall)
 
 Cerca de metade das vezes que o chove modelo prediu que não iria chover. Porém ele acerta a grande maioria das vezes quando prediz que vai ocorrer chuva no dia seguinte.
 
-#### Visualizando as curvas de ROC e Precision e Recall.
 
-```{r}
-precrec_obj <- evalmod(scores =as.integer(y_pred), labels = test_set$RainTomorrow)
-autoplot(precrec_obj)
-
-```
 
 
 
