@@ -43,6 +43,9 @@ Geralmente, os incêndios mais devastadores são precedidos por altas temperatur
 
 Portanto, considerando os recursos limitados para combate aos incêndios florestais, ainda mais com o aumento das mudanças climáticas que estão tornando esses eventos mais frequentes e devastadores, saber se irá chover em uma região específica dadas algumas medições é importante para direcionar os esforços onde eles são mais necessários. 
 
+### Dataset
+O conjunto de dados utilizado contém cerca de 10 anos de observações diárias tiradas de estações meteorológicas em 49 locais na Austrália. O dataset é composto por informações como Data e Local da observação, dados meteorológicos do dia no local como Direção do vento, humidade e temperatura além de duas features categóricas: RainToday e RainTomorrow que indicam se choveu 1 mm ou mais no dia da observação e no dia seguinte respectivamente.  
+
 ### Visualizando os Dados 
 
 ```{r}
@@ -51,7 +54,7 @@ print(dataset)
 ```
 
 
-Usando a API do Google Maps para salvar as coordenadas geográficas de cada local de medição, como existem vários lugares com o mesmo nome em diferentes países anglófonos, é necessário concatenar o nome do país no final do local para garantir que as coordenadas estarão coerentes
+Usando a API do Google Maps para salvar as coordenadas geográficas de cada local de medição, como existem vários lugares com o mesmo nome em diferentes países anglófonos, é necessário concatenar o nome do país no final do local para garantir que as coordenadas estarão coerentes.
 
 ```{r message=FALSE}
 LocCount <- dataset %>% count(Location)
@@ -59,7 +62,7 @@ LocCount <- dataset %>% count(Location)
 LocCount$Category <- paste(LocCount$Location, ", Australia")# Adding Australia to the end of location name since there are many cities with the same names in other countries
 
 cities_df <- as.data.frame(LocCount)
-locations_df <- mutate_geocode(cities_df, Category)
+locations_df <- mutate_geocode(cities_df, Category) # Getting the coordinates with the google maps API
 locations <- as_tibble(locations_df)
 
 print(locations)
@@ -67,7 +70,7 @@ print(locations)
 
 
 ```{r}
-df <- merge(x = dataset, y = locations, by = "Location", all = TRUE) # Outer join
+df <- merge(x = dataset, y = locations, by = "Location", all = TRUE) # Outer join to combine the orignial df with the location coordinates
 ```
 
 ```{r message=FALSE, warning=FALSE}
@@ -78,7 +81,7 @@ map <- get_googlemap(center = c(aus_coord$lon, aus_coord$lat), zoom = 4)
 
 ```
 
-#### Mapa com as Temperaturas Máximas de Cada Local 
+#### Mapa com as Médias de Temperaturas Máximas de Cada Local 
 
 ```{r fig.height=7, fig.width=11, warning=FALSE}
 
@@ -139,18 +142,53 @@ RD <- df[!is.na(df$Rainfall), ] %>%   # Removing missing data
 # substring(RD$Date,6,7) # Month only
 RainMonth = aggregate(RD$Rainfall, by=list(Month=substring(RD$Date,6,7)), FUN=mean) # Average daily Rainfall by month
 
-```
 
-
-```{r}
 ggplot(data=RainMonth, aes(x=Month, y=x, group=1)) +
   geom_line()+
   geom_point() +
   xlab("Month") +
-  ylab("Average Rainfall (mm per day)") 
-
-
+  ylab("Average Rainfall (mm per day)")
 ```
+
+O gráfico acima demonstra que os meses de verão tem uma média de chuva muito maior que os meses de inverno, que tendem a ser mais secos.
+
+
+### Relação entre incidência solar e chuva
+```{r}
+SunRain <- df[!is.na(df$Sunshine) & !is.na(df$Rainfall),] %>%   # Removing missing data
+  select(Sunshine, Rainfall)
+
+
+RainSun = aggregate(SunRain$Rainfall, by=list(Sunshine=SunRain$Sunshine), FUN=mean) # Average daily Rainfall by hours of sunshine
+
+
+ggplot(data=RainSun, aes(x=Sunshine, y=x)) +
+  geom_line()+
+  xlab("Sunshine (hours in day)") +
+  ylab("Average Rainfall (mm)")
+```
+
+Como é possível notar, existe uma relação inversa entre a incidência solar e a quantidade de chuva.
+
+### Incidência Solar por Mês
+
+```{r}
+SunMonth <- df[!is.na(df$Sunshine) & !is.na(df$Date),] %>%   # Removing missing data
+  select(Date, Sunshine)
+
+MonthSun = aggregate(SunMonth$Sunshine, by=list(Month=substring(SunMonth$Date,6,7)), FUN=sum) # sunlight by month
+
+
+
+ggplot(data=MonthSun, aes(x=Month, y=x, group=1)) +
+  geom_line()+
+  geom_point() +
+  ylab("Sunshine (hours)") +
+  xlab("Month") 
+```
+
+
+Comparando o gráfico acima com o de Média de Precipitação por Mês, é reforçada a hipótese da relação inversa entre a incidência solar e a quantidade de chuva,
 
 ### Precipitação em relação à direção do vento
 
@@ -177,7 +215,7 @@ final_df <- rbind(final_df3, final_df9)
 
 final_df <- final_df %>% mutate_if(is.character,as.numeric)
 
-# Adding a Min and Max rows to the Dataframe for the chart plotting
+# Adding a Min and Max rows to the Dataframe to scale the chart 
 max_min <- data.frame(
   N = c(4, 0), NNW = c(4, 0), NW = c(4, 0),
   WNW = c(4, 0), W = c(4, 0), WSW = c(4, 0),
@@ -273,29 +311,42 @@ X <- subset(training_set, select=-c(RainTomorrow))
 
 classifier = randomForest(x = X,
                           y = y,
-                          ntree = 100)
+                          ntree = 30)
 
 classifier
-```
-
-#### Matriz de confusão.
-
-```{r}
-y_pred = predict(classifier, newdata = subset(test_set, select=-c(RainTomorrow)))
-
-# Confusion Matrix
-cm = table(test_set$RainTomorrow, y_pred)
-print(cm)
-
 ```
 
 #### Calculando a acurácia do modelo.
 
 ```{r}
 # Accuracy Score
+
+y_pred = predict(classifier, newdata = subset(test_set, select=-c(RainTomorrow)))
+
 accuracy = sum(y_pred == test_set$RainTomorrow) / nrow(test_set)
 print(accuracy)
 ```
+Considerando que previsões meteorológicas tem  uma acurácia de cerca de 90% para previsões em um período de cinco dias(https://scijinks.gov/forecast-reliability/), a acurácia do modelo de aproximadamente 86% pode ser considerada razoável,
+
+#### Matriz de confusão.
+
+```{r}
+
+# Confusion Matrix
+cm = table(test_set$RainTomorrow, y_pred)
+print(cm)
+```
+#### Calculando o precision e recall.
+
+```{r}
+recall = cm[2:2,2]/(cm[2:2,1]+cm[2:2,2])
+precision = cm[2:2,2]/(cm[0:1,2]+cm[2:2,2])
+
+cat("Precision:", precision, "\n")
+cat("Recall:", recall)
+```
+
+Cerca de metade das vezes que o chove modelo prediu que não iria chover. Porém ele acerta a grande maioria das vezes quando prediz que vai ocorrer chuva no dia seguinte.
 
 #### Visualizando as curvas de ROC e Precision e Recall.
 
@@ -304,6 +355,7 @@ precrec_obj <- evalmod(scores =as.integer(y_pred), labels = test_set$RainTomorro
 autoplot(precrec_obj)
 
 ```
+
 
 
 
