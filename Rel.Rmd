@@ -345,19 +345,7 @@ precision = cm[2:2,2]/(cm[0:1,2]+cm[2:2,2])
 cat("Precision:", precision, "\n")
 cat("Recall:", recall)
 ```
-
-Cerca de metade das vezes que o chove modelo prediu que não iria chover. Porém ele acerta a grande maioria das vezes quando prediz que vai ocorrer chuva no dia seguinte.
-
-
-
-
-
-
-
-
-
-
-
+Cerca de metade das vezes que o chove modelo predisse que não iria chover. Porém ele acerta a grande maioria das vezes quando prediz que vai ocorrer chuva no dia seguinte, o que é melhor do que se ele predisse que fosse chover e não chovesse. Portanto o modelo ainda pode ser melhorado ou ser utilizado outro tipo de modelo para fazer as predições.
 
 
 
